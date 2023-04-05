@@ -21,7 +21,7 @@ c.updateEdgeSignature((1, 2), r)
 
 # Look at some info.
 print(c.connectionLaplacianMatrix.toarray())
-vals, _ = sp.sparse.linage.eigs(c.connectionLaplacianMatrix, k=4, which='LM')
+vals, _ = sp.sparse.linalg.eigs(c.connectionLaplacianMatrix, k=4, which='LM')
 print(vals)
 # Very weird. These are the "wrong" eigenvalues.
 
@@ -33,6 +33,11 @@ h.setEdgeConnection((1, 2), r)
 
 # Verify that, as numpy arrays, the CLMs are identical
 print(h.connectionLaplacianMatrix - c.connectionLaplacianMatrix.toarray())
+
+eigenvalues, _ = numpy.linalg.eig(c.connectionLaplacianMatrix.toarray())
+
+print(eigenvalues)
+print(vals)
 
 # But weird, the eigenvalues are completetely different. These are the correct ones.
 print(h.connectionLaplacianMatrixEigenvalues)

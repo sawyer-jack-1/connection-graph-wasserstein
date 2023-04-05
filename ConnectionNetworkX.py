@@ -2,7 +2,7 @@ import networkx as nx
 import scipy
 import numpy
 
-class ConnectionNetworkX(nx.DiGraph):
+class ConnectionNetworkX(nx.Graph):
 
     def __init__(self, a, dim):
         super().__init__(a)
