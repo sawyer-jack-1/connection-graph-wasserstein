@@ -8,14 +8,14 @@ import matplotlib.pyplot as plt
 class GraphX(object):
     # initialization arg: adjacency matrix a (format np.array)
     # Throwing in a __new__ just to do some non-comprehensive idiot-proofing
-    def __new__(cls, adj, *args, **kwargs):
-        try:
-            if (adj.shape[0] != adj.shape[1]) or ((len(adj.shape) >= 3) or not np.allclose(adj, adj.T)):
-                raise ValueError
-        except ValueError:
-            print("[Err:GraphX:invalidAdjacencyDimensions] Adjacency matrices must be square and symmetric.")
-            return super(GraphX, cls).__new__(cls)
-        return object.__new__(cls)
+    #def __new__(cls, adj, *args, **kwargs):
+    #    try:
+    #        if (adj.shape[0] != adj.shape[1]) or ((len(adj.shape) >= 3) or not np.allclose(adj, adj.T)):
+    #            raise ValueError
+    #    except ValueError:
+    #        print("[Err:GraphX:invalidAdjacencyDimensions] Adjacency matrices must be square and symmetric.")
+    #        return super(GraphX, cls).__new__(cls)
+    #    return object.__new__(cls)
 
     def __init__(self, adj, *args, **kwargs):
         self.__adjacencyMatrix = adj  # adjacency matrix, used in init
