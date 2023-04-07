@@ -12,32 +12,19 @@ g = nx.cycle_graph(3)
 DIM_CONNECTION = 2
 
 # Test rotation
-r = numpy.array([[0, -1], [1, 0]])
+r = numpy.array([[-1, 0], [0, -1]])
 
 # Use CNX to add some rotation
 c = ConnectionNetworkX.ConnectionNetworkX(nx.adjacency_matrix(g), DIM_CONNECTION)
-c.updateEdgeSignature((0,1), r)
+c.updateEdgeSignature((0, 1), r)
 c.updateEdgeSignature((1, 2), r)
 
-# Look at some info.
 print(c.connectionLaplacianMatrix.toarray())
-vals, _ = sp.sparse.linalg.eigs(c.connectionLaplacianMatrix, k=4, which='LM')
-print(vals)
-# Very weird. These are the "wrong" eigenvalues.
 
-# To see this: construct an identical connection graph using CGX
-a = [[0, 1, 1], [1, 0, 1], [1, 1, 0]]
-h = cgx.ConnectionGraphX(np.array(a), DIM_CONNECTION)
-h.setEdgeConnection((0,1), r)
-h.setEdgeConnection((1, 2), r)
+c.printConnectionLaplacianEigenvalues(n=4)
 
-# Verify that, as numpy arrays, the CLMs are identical
-print(h.connectionLaplacianMatrix - c.connectionLaplacianMatrix.toarray())
+c.removeEdge((0, 1))
 
-eigenvalues, _ = numpy.linalg.eig(c.connectionLaplacianMatrix.toarray())
+print(c.connectionLaplacianMatrix.toarray())
 
-print(eigenvalues)
-print(vals)
-
-# But weird, the eigenvalues are completetely different. These are the correct ones.
-print(h.connectionLaplacianMatrixEigenvalues)
+# print(c.connectionLaplacianMatrix)
