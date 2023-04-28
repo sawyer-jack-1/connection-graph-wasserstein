@@ -24,6 +24,7 @@ class ConnectionNetworkX(nx.Graph):
 
         self.initializeConenctionLaplacian()
 
+        self.imageData = None
     def initializeConenctionLaplacian(self):
         for edgeIndex, e in zip(range(self.nEdges), self.edges()):
             fromNode = e[0]
@@ -65,8 +66,8 @@ class ConnectionNetworkX(nx.Graph):
         degreeFrom = self.connectionLaplacianMatrix[fromNode * d, fromNode * d]
         degreeTo = self.connectionLaplacianMatrix[toNode * d, toNode * d]
 
-        self.remove_edge(fromNode, toNode)
-        self.nEdges = self.number_of_edges()
+        # self.remove_edge(fromNode, toNode)
+        # self.nEdges = self.number_of_edges()
 
         self.connectionIncidenceMatrix[(fromNode * d):((fromNode + 1) * d), (edgeIndex * d):((edgeIndex + 1) * d)] = z
         self.connectionIncidenceMatrix[(toNode * d):((toNode + 1) * d), (edgeIndex * d):((edgeIndex + 1) * d)] = z
@@ -118,6 +119,8 @@ def cnxFromImageDirectory(filePath, intrinsicDimension, k=None, nImages=None, sa
                                                                                                    format='lil')
     cnx = ConnectionNetworkX(cnxAdjacency, intrinsicDimension)
 
+    cnx.imageData = X
+
     nRemoteEdges = 0
     totalEdgesBeforeRemoval = cnx.nEdges
     for i in tqdm(range(nImages)):
@@ -135,7 +138,7 @@ def cnxFromImageDirectory(filePath, intrinsicDimension, k=None, nImages=None, sa
                 cnx.updateEdgeSignature((i,j), Tij)
 
             else:
-                #cnx.removeEdge((i,j))
+                cnx.removeEdge((i,j))
                 nRemoteEdges += 1
 
     print('Proportion of edges which were removed due to remoteness: ', nRemoteEdges / totalEdgesBeforeRemoval)
