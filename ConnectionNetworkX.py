@@ -145,3 +145,11 @@ def cnxFromImageDirectory(filePath, intrinsicDimension, k=None, nImages=None, sa
     cnx.printConnectionLaplacianEigenvalues()
 
     return cnx
+
+def cnxFromPixelGrid(width, height, intrinsicDimension):
+
+    g = nx.grid_2d_graph(width, height)
+
+    cnx = ConnectionNetworkX(nx.adjacency_matrix(g), intrinsicDimension)
+
+    return cnx
