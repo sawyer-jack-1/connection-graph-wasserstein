@@ -110,6 +110,7 @@ def cnxFromImageDirectory(filePath, intrinsicDimension, k=None, nImages=None, sa
         k = X.shape[0] // 50
 
     buml_obj = buml_.BUML(local_opts={'algo': 'LPCA', 'k': k},
+                          intermed_opts={'eta_max': 1},
                           vis_opts={'c': labelsMat[:, 0], 'save_dir': save_dir_root},
                           verbose=True, debug=True, exit_at='local_views')
 
