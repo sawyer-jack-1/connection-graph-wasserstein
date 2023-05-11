@@ -19,12 +19,15 @@ c = ConnectionNetworkX.ConnectionNetworkX(nx.adjacency_matrix(g), DIM_CONNECTION
 c.updateEdgeSignature((0, 1), r)
 c.updateEdgeSignature((1, 2), r)
 
-print(c.connectionLaplacianMatrix.toarray())
+A = np.array([[1,2,3], [4,5,6], [7,8,9], [10, 11, 12]])
+mean = A.mean(axis=1)
 
-c.printConnectionLaplacianEigenvalues(n=4)
+print(mean)
+print(A.shape)
+
+A = A - mean[:, np.newaxis]
+
+print(A)
 
 c.removeEdge((0, 1))
-
-print(c.connectionLaplacianMatrix.toarray())
-
 # print(c.connectionLaplacianMatrix)
