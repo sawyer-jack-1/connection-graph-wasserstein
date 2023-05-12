@@ -3,6 +3,7 @@ import scipy
 import numpy as np
 import random
 from tqdm import tqdm
+import torch
 
 import puppets_data
 from pyLDLE2 import datasets
@@ -25,6 +26,8 @@ class ConnectionNetworkX(nx.Graph):
         self.initializeConenctionLaplacian()
 
         self.imageData = None
+
+        self.gridEmbedding = None # To be implemented when initializing as a grid graph.
     def initializeConenctionLaplacian(self):
         for edgeIndex, e in zip(range(self.nEdges), self.edges()):
             fromNode = e[0]
@@ -135,8 +138,8 @@ def cnxFromImageDirectory(filePath, intrinsicDimension, k=None, nImages=None, sa
                 X_Uij_j = buml_obj.LocalViews.local_param_post.eval_({'view_index': j, 'data_mask': n_ij})
 
 
-                X_Uij_i = X_Uij_i - X_Uij_i.mean(axis=1)[:, np.newaxis]
-                X_Uij_j = X_Uij_j - X_Uij_j.mean(axis=1)[:, np.newaxis]
+                X_Uij_i = X_Uij_i - X_Uij_i.mean(axis=0)[:, np.newaxis]
+                X_Uij_j = X_Uij_j - X_Uij_j.mean(axis=0)[:, np.newaxis]
 
                 Tij, _ = scipy.linalg.orthogonal_procrustes(X_Uij_i, X_Uij_j)
 
@@ -157,4 +160,51 @@ def cnxFromPixelGrid(width, height, intrinsicDimension):
 
     cnx = ConnectionNetworkX(nx.adjacency_matrix(g), intrinsicDimension)
 
+    ge = {}
+
+    if ((height > 1) & (width > 1)):
+        for node in cnx.nodes:
+            x = (node % width) / (width - 1)
+            y = 1 - (node // height) / (height - 1)
+            ge[node] = (x, y)
+
+        cnx.gridEmbedding = ge
+
     return cnx
+
+def loss_fn(phi, B, w, c):
+    loss0 = -torch.sum(phi*c)
+
+    loss1 = torch.matmul(B, phi).reshape((w.shape[0],-1))
+    loss1 = torch.linalg.norm(loss1, dim=1)
+    loss1 = loss1 - w
+    loss1 = torch.nn.ReLU()(loss1)
+    loss1 = torch.sum(loss1**2)
+
+    return loss0, loss1
+
+def active_edges(phi, B, w, c):
+    loss = torch.matmul(B, phi).reshape((w.shape[0],-1))
+    loss = torch.linalg.norm(loss, dim=1)
+    loss = loss - w
+    return loss
+
+def optimize(B, w, c, alpha, learning_rate, n_epochs, phi0 = None, print_freq=10):
+    if phi0 is None:
+        phi = torch.randn(B.shape[1], 1, requires_grad=True)
+    else:
+        phi = torch.tensor(phi0, requires_grad=True)
+    optimizer = torch.optim.Adam([phi], lr=learning_rate)
+    for epoch in range(n_epochs):
+        # Compute loss
+        loss0, loss1 = loss_fn(phi, B, w, c)
+        loss = loss0 + (0.5/alpha)*loss1
+
+        # Backpropagation
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if epoch % print_freq == 0:
+            print(f"epoch: {epoch}, loss: {loss:>7f}, loss0: {loss0:>7f}, loss1: {loss1:>7f}")
+    return phi
