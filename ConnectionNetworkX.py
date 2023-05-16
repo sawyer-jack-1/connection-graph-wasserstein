@@ -157,6 +157,15 @@ def cnxFromImageDirectory(filePath, intrinsicDimension, k=None, nImages=None, sa
 def cnxFromPixelGrid(width, height, intrinsicDimension):
 
     g = nx.grid_2d_graph(width, height)
+    g.add_edges_from([
+                         ((x, y), (x+1, y+1))
+                         for x in range(width - 1)
+                         for y in range(height - 1)
+                     ] + [
+                         ((x+1, y), (x, y+1))
+                         for x in range(width - 1)
+                         for y in range(height - 1)
+                     ], weight=1)
 
     cnx = ConnectionNetworkX(nx.adjacency_matrix(g), intrinsicDimension)
 
