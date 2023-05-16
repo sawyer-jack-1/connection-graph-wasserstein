@@ -26,6 +26,8 @@ class ConnectionNetworkX(nx.Graph):
         self.initializeConenctionLaplacian()
 
         self.imageData = None
+        self.width = None
+        self.height = None
 
         self.gridEmbedding = None # To be implemented when initializing as a grid graph.
     def initializeConenctionLaplacian(self):
@@ -157,6 +159,7 @@ def cnxFromImageDirectory(filePath, intrinsicDimension, k=None, nImages=None, sa
 def cnxFromPixelGrid(width, height, intrinsicDimension):
 
     g = nx.grid_2d_graph(width, height)
+
     g.add_edges_from([
                          ((x, y), (x+1, y+1))
                          for x in range(width - 1)
@@ -179,6 +182,8 @@ def cnxFromPixelGrid(width, height, intrinsicDimension):
 
         cnx.gridEmbedding = ge
 
+    cnx.width = width
+    cnx.height = height
     return cnx
 
 def loss_fn(phi, B, w, c):
