@@ -146,8 +146,8 @@ def cnxFromImageDirectory(filePath, intrinsicDimension, k=None, nImages=None, sa
                 X_Uij_j = buml_obj.LocalViews.local_param_post.eval_({'view_index': j, 'data_mask': n_ij})
 
 
-                X_Uij_i = X_Uij_i - X_Uij_i.mean(axis=0)[:, np.newaxis]
-                X_Uij_j = X_Uij_j - X_Uij_j.mean(axis=0)[:, np.newaxis]
+                X_Uij_i = X_Uij_i - X_Uij_i.mean(axis=0)[np.newaxis, :]
+                X_Uij_j = X_Uij_j - X_Uij_j.mean(axis=0)[np.newaxis, :]
 
                 Tij, _ = scipy.linalg.orthogonal_procrustes(X_Uij_i, X_Uij_j)
 
