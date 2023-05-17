@@ -7,6 +7,8 @@ import random
 from tqdm import tqdm
 import torch
 
+from scipy.linalg import svdvals
+
 import puppets_data
 from pyLDLE2 import datasets
 from pyLDLE2 import buml_
@@ -104,9 +106,10 @@ class ConnectionNetworkX(nx.Graph):
                 print("MOST LIKELY INCONSISTENT: |lambda_min| >= 1e-8. ")
 
 
-def cnxFromImageDirectory(filePath, intrinsicDimension, k=None, nImages=None, save_dir_root=None):
+def cnxFromImageDirectory(filePath, intrinsicDimension, k=None, nImages=None, save_dir_root=None, tol=1e-3):
     Y, labelsMat, _ = puppets_data.puppets_data(filePath)
 
+    np.random.seed(42)
     if nImages is None:
         X = Y
         nImages = X.shape[0]
@@ -124,15 +127,13 @@ def cnxFromImageDirectory(filePath, intrinsicDimension, k=None, nImages=None, sa
                           intermed_opts={'eta_max': 1},
                           vis_opts={'c': labelsMat[:, 0], 'save_dir': save_dir_root},
                           verbose=True, debug=True, exit_at='local_views')
-
     buml_obj.fit(X=X)
-
-    cnxAdjacency = buml_obj.LocalViews.U + buml_obj.LocalViews.U.T - scipy.sparse.identity(nImages,
-                                                                                                   format='lil')
+    
+    cnxAdjacency = buml_obj.LocalViews.U + buml_obj.LocalViews.U.T -\
+                    scipy.sparse.identity(nImages, format='lil')
     cnx = ConnectionNetworkX(cnxAdjacency, intrinsicDimension)
-
     cnx.imageData = X
-
+    
     nRemoteEdges = 0
     totalEdgesBeforeRemoval = cnx.nEdges
     for i in tqdm(range(nImages)):
@@ -141,18 +142,16 @@ def cnxFromImageDirectory(filePath, intrinsicDimension, k=None, nImages=None, sa
 
             n_ij = buml_obj.LocalViews.U[i,:].multiply(buml_obj.LocalViews.U[j,:]).nonzero()[1]
 
-            if len(n_ij) >= intrinsicDimension:
-                X_Uij_i = buml_obj.LocalViews.local_param_post.eval_({'view_index': i, 'data_mask': n_ij})
-                X_Uij_j = buml_obj.LocalViews.local_param_post.eval_({'view_index': j, 'data_mask': n_ij})
+            X_Uij_i = buml_obj.LocalViews.local_param_post.eval_({'view_index': i, 'data_mask': n_ij})
+            X_Uij_j = buml_obj.LocalViews.local_param_post.eval_({'view_index': j, 'data_mask': n_ij})
 
-
-                X_Uij_i = X_Uij_i - X_Uij_i.mean(axis=0)[np.newaxis, :]
-                X_Uij_j = X_Uij_j - X_Uij_j.mean(axis=0)[np.newaxis, :]
-
+            X_Uij_i = X_Uij_i - X_Uij_i.mean(axis=0)[np.newaxis, :]
+            X_Uij_j = X_Uij_j - X_Uij_j.mean(axis=0)[np.newaxis, :]
+            
+            svdvals_ = svdvals(np.dot(X_Uij_i.T,X_Uij_j))
+            if svdvals_[-1] > tol:
                 Tij, _ = scipy.linalg.orthogonal_procrustes(X_Uij_i, X_Uij_j)
-
                 cnx.updateEdgeSignature((i,j), Tij)
-
             else:
                 cnx.removeEdge((i,j))
                 nRemoteEdges += 1
