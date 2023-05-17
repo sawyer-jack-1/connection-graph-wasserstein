@@ -1,3 +1,5 @@
+import math
+
 import networkx as nx
 import scipy
 import numpy as np
@@ -30,17 +32,20 @@ class ConnectionNetworkX(nx.Graph):
         self.height = None
 
         self.gridEmbedding = None # To be implemented when initializing as a grid graph.
+
     def initializeConenctionLaplacian(self):
         for edgeIndex, e in zip(range(self.nEdges), self.edges()):
+
             fromNode = e[0]
             toNode = e[1]
+            w = nx.adjacency_matrix(self)[fromNode, toNode]
 
             colIndexRange = range(edgeIndex * self.dimConnection, (edgeIndex + 1) * self.dimConnection)
             rowIndexRangeFromNode = range(fromNode * self.dimConnection, (fromNode + 1) * self.dimConnection)
             rowIndexRangeToNode = range(toNode * self.dimConnection, (toNode + 1) * self.dimConnection)
 
-            self.connectionIncidenceMatrix[rowIndexRangeFromNode, colIndexRange] = 1
-            self.connectionIncidenceMatrix[rowIndexRangeToNode, colIndexRange] = -1
+            self.connectionIncidenceMatrix[rowIndexRangeFromNode, colIndexRange] = math.sqrt(w)
+            self.connectionIncidenceMatrix[rowIndexRangeToNode, colIndexRange] = -math.sqrt(w)
 
         # Force into lil_matrix since scipy wants to convert to csr after matmul.
         self.connectionLaplacianMatrix = scipy.sparse.lil_matrix(
@@ -52,13 +57,14 @@ class ConnectionNetworkX(nx.Graph):
         edgeIndex = list(self.edges()).index(edge)
         d = self.dimConnection
         O_sparse = scipy.sparse.lil_matrix(rotation)
+        w = nx.adjacency_matrix(self)[fromNode, toNode]
 
         self.connectionIncidenceMatrix[(toNode * d):((toNode + 1) * d), (edgeIndex * d):((edgeIndex + 1) * d)] = (
-                                                                                                                     -1) * O_sparse
+                                                                                                                     -math.sqrt(w)) * O_sparse
         self.connectionLaplacianMatrix[(fromNode * d):((fromNode + 1) * d), (toNode * d):((toNode + 1) * d)] = (
-                                                                                                                   -1) * O_sparse
+                                                                                                                   -w) * O_sparse
         self.connectionLaplacianMatrix[(toNode * d):((toNode + 1) * d), (fromNode * d):((fromNode + 1) * d)] = (
-                                                                                                                   -1) * O_sparse.T
+                                                                                                                   -w) * O_sparse.T
 
     def removeEdge(self, edge):
 
@@ -168,7 +174,7 @@ def cnxFromPixelGrid(width, height, intrinsicDimension):
                          ((x+1, y), (x, y+1))
                          for x in range(width - 1)
                          for y in range(height - 1)
-                     ], weight=1)
+                     ], weight=math.sqrt(2))
 
     cnx = ConnectionNetworkX(nx.adjacency_matrix(g), intrinsicDimension)
 
