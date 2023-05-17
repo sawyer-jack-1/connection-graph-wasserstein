@@ -208,6 +208,15 @@ def active_edges(phi, B, w, c):
     loss = loss - w
     return loss
 
+def optimal_J(phi, B, w, alpha, d):
+    Bphi = torch.matmul(B, phi).reshape((w.shape[0],-1))
+    loss = torch.linalg.norm(Bphi, dim=1)
+    loss = (loss - w)/alpha
+    J2 = torch.nn.ReLU()(loss)
+    temp = w + alpha*J2
+    J = Bphi * torch.unsqueeze(J2/temp, 1)
+    return J
+
 def optimize(B, w, c, alpha, learning_rate, n_epochs, phi0 = None, print_freq=10):
     if phi0 is None:
         phi = torch.randn(B.shape[1], 1, requires_grad=True)
