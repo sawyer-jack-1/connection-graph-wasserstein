@@ -215,7 +215,7 @@ def optimal_J(phi, B, w, alpha, d):
     J2 = torch.nn.ReLU()(loss)
     temp = w + alpha*J2
     J = Bphi * torch.unsqueeze(J2/temp, 1)
-    return J
+    return -J
 
 def optimize(B, w, c, alpha, learning_rate, n_epochs, phi0 = None, print_freq=10):
     if phi0 is None:
