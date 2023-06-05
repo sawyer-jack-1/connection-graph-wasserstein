@@ -8,13 +8,15 @@ import random
 from tqdm import tqdm
 import torch
 
-from scipy.linalg import svdvals
+from scipy.linalg import svdvals, svd
 from scipy.sparse import kron, csr_matrix, lil_matrix, identity
 
 import puppets_data
 from pyLDLE2 import datasets
 from pyLDLE2 import buml_
 from pyLDLE2 import util_
+
+from sklearn.neighbors import NearestNeighbors
 
 
 class ConnectionNetworkX(nx.Graph):
@@ -134,6 +136,68 @@ def cnxFromData(X, k, d,  tol=1e-3):
         for j in [j for j in n_i if j > i]:
             cnx.updateEdgeSignature((i,j), sigma[(i,j)])
     
+    cnx.printConnectionLaplacianEigenvalues()
+    return cnx
+
+def epanechnikov_kernel(dist, eps):
+    return np.sqrt((1-dist**2/eps)*np.clip(dist/np.sqrt(eps), 0, 1))
+
+def gaussian_kernel(W, eps):
+    W.data = np.exp(-W.data**2/eps)*np.clip(W.data/np.sqrt(eps), 0, 1)
+    W.eliminate_zeros()
+    return W
+
+# eps_pca <= eps
+def cnxFromData_v2(X, eps_pca, eps, d,  tol=1e-6):
+    # Form neighborhoods
+    neigh = NearestNeighbors(radius=eps)
+    neigh.fit(X)
+    neigh_inds_pca = neigh.radius_neighbors(radius=eps_pca, return_distance=False)
+    n, p = X.shape
+    O = np.zeros((n, p, d))
+    for i in range(n):
+        n_i = neigh_inds_pca[i] # N_i = |n_i|
+        X_i = (X[n_i,:] - X[i,:][None,:]).T # p x N_i
+        X_i_norm = np.linalg.norm(X_i, axis=0) # N_i dimensional
+        D_i = epanechnikov_kernel(X_i_norm, eps_pca) #N_i dimensional
+        B_i = X_i * D_i[None,:]
+        U_i, Sigma_i, V_iT = svd(B_i)
+        O_i = U_i[:,:d]
+        O[i,:,:] = O_i
+    
+    neigh_graph = neigh.radius_neighbors_graph(mode='distance')
+    G = nx.Graph(gaussian_kernel(neigh_graph, eps))
+    
+    sigma = {}
+    nRemoteEdges = 0
+    totalEdgesBeforeRemoval = len(G.edges)
+    for i in tqdm(range(n)):
+        n_i = nx.neighbors(G, i)
+        O_i = O[i,:,:]
+        O_iO_iT = O_i.dot(O_i.T)
+        for j in [j for j in n_i if j > i]:
+            O_j = O[j,:,:]
+            O_jO_jT = O_j.dot(O_j.T)
+            grassmannian = np.linalg.norm(O_iO_iT-O_jO_jT, ord=2)
+            if grassmannian < tol:
+                O_iTO_j = O_i.T.dot(O_j)
+                U, Sigma, VT = svd(O_iTO_j)
+                sigma_ij = U.dot(VT)
+                sigma[(i,j)] = sigma_ij
+            else:
+                G.remove_edge(i, j)
+                nRemoteEdges += 1
+    
+    print('Proportion of edges which were removed due to remoteness: ', nRemoteEdges / totalEdgesBeforeRemoval)
+    cnx = ConnectionNetworkX(nx.adjacency_matrix(G), d)
+    assert cnx.number_of_nodes() == n, 'a node is missing'
+
+    #for i in tqdm(range(n)):
+    for i in range(n):
+        n_i = nx.neighbors(cnx, i)
+        for j in [j for j in n_i if j > i]:
+            cnx.updateEdgeSignature((i,j), sigma[(i,j)])
+            
     cnx.printConnectionLaplacianEigenvalues()
     return cnx
 
