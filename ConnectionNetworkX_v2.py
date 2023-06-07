@@ -9,7 +9,7 @@ from tqdm import tqdm
 import torch
 
 from scipy.linalg import svdvals, svd
-from scipy.sparse import kron, csr_matrix, lil_matrix, identity
+from scipy.sparse import kron, csr_matrix, lil_matrix, identity, triu
 
 import puppets_data
 from pyLDLE2 import datasets
@@ -33,9 +33,12 @@ class ConnectionNetworkX(nx.Graph):
         self.gridEmbedding = None # To be implemented when initializing as a grid graph.
         
     def initializeConenctionLaplacian(self):
-        directed_self = nx.DiGraph(self.edges())
+        adj_mat = triu(nx.adjacency_matrix(self))
+        directed_self = nx.DiGraph(adj_mat)
         #W = kron(nx.adjacency_matrix(directed_self), np.ones((self.d, self.d)))
-        self.B = kron(nx.incidence_matrix(directed_self, oriented=True), np.eye(self.d))
+        B_ = nx.incidence_matrix(directed_self, oriented=True, weight='weight')
+        B_.data = np.sign(B_.data)*np.sqrt(np.abs(B_.data))
+        self.B = kron(B_, np.eye(self.d))
         self.CL = self.B.dot(self.B.T)
         self.B = self.B.tolil()
         self.CL = self.CL.tolil()
@@ -61,13 +64,16 @@ class ConnectionNetworkX(nx.Graph):
         self.setBlockOfCL(u, v, -w * O)
         self.setBlockOfCL(v, u, -w * O.T)
         
-    def removeEdge(self, edge):
+    def removeEdge(self, edge, w=None):
         u = edge[0]
         v = edge[1]
         i = list(self.edges()).index(edge)
         d = self.d
         z1 = lil_matrix((d, d))
         z2 = lil_matrix(np.eye(d))
+        
+        if w is None:
+            w = self[u][v]['weight']
 
         d_out = self.CL[u * d, u * d]
         d_in = self.CL[v * d, v * d]
@@ -75,17 +81,20 @@ class ConnectionNetworkX(nx.Graph):
         # self.remove_edge(fromNode, toNode)
         self.setBlockOfB(u, i, z1)
         self.setBlockOfB(v, i, z1)
-        self.setBlockOfCL(u, u, (d_out - 1) * z2)
-        self.setBlockOfCL(v, v, (d_in - 1) * z2)
+        self.setBlockOfCL(u, u, (d_out - w) * z2)
+        self.setBlockOfCL(v, v, (d_in - w) * z2)
         self.setBlockOfCL(u, v, z1)
         self.setBlockOfCL(v, u, z1)
 
-    def printConnectionLaplacianEigenvalues(self, k=10, which="LM", sigma=-1e-3, showBalanced=True):
-        vals = scipy.sparse.linalg.eigsh(self.CL, which=which, sigma=sigma, k=k, return_eigenvectors=False)
+    def printConnectionLaplacianEigenvalues(self, k=None, which="LM", sigma=-1e-3, showBalanced=True):
+        if k is None:
+            k = self.d+1
+        vals = scipy.sparse.linalg.eigsh(self.CL, which=which, sigma=sigma,
+                                         k=k, return_eigenvectors=False)
         tolerance = 1e-8
         print(vals)
         if showBalanced:
-            if abs(vals[k - 1]) < tolerance:
+            if abs(vals[self.d-1]) < tolerance:
                 print("MOST LIKELY CONSISTENT: |lambda_min| < 1e-8. ")
             else:
                 print("MOST LIKELY INCONSISTENT: |lambda_min| >= 1e-8. ")
@@ -171,6 +180,7 @@ def cnxFromData_v2(X, eps_pca, eps, d,  tol=1e-6):
     sigma = {}
     nRemoteEdges = 0
     totalEdgesBeforeRemoval = len(G.edges)
+    print('Total edges before removal:', totalEdgesBeforeRemoval)
     for i in tqdm(range(n)):
         n_i = nx.neighbors(G, i)
         O_i = O[i,:,:]
@@ -190,15 +200,15 @@ def cnxFromData_v2(X, eps_pca, eps, d,  tol=1e-6):
     
     print('Proportion of edges which were removed due to remoteness: ', nRemoteEdges / totalEdgesBeforeRemoval)
     cnx = ConnectionNetworkX(nx.adjacency_matrix(G), d)
+    #cnx.printConnectionLaplacianEigenvalues()
     assert cnx.number_of_nodes() == n, 'a node is missing'
 
-    #for i in tqdm(range(n)):
-    for i in range(n):
+    for i in tqdm(range(n)):
         n_i = nx.neighbors(cnx, i)
         for j in [j for j in n_i if j > i]:
             cnx.updateEdgeSignature((i,j), sigma[(i,j)])
             
-    cnx.printConnectionLaplacianEigenvalues()
+    #cnx.printConnectionLaplacianEigenvalues()
     return cnx
 
 def cnxFromPixelGrid(width, height, intrinsicDimension):
