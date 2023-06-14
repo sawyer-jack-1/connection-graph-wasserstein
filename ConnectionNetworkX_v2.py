@@ -157,7 +157,7 @@ def gaussian_kernel(W, eps):
     return W
 
 # eps_pca <= eps
-def cnxFromData_v2(X, eps_pca, eps, d,  tol=1e-6):
+def cnxFromData_v2(X, eps_pca, eps, d,  tol=1e-6, triv_sigma=False):
     # Form neighborhoods
     neigh = NearestNeighbors(radius=eps)
     neigh.fit(X)
@@ -179,6 +179,7 @@ def cnxFromData_v2(X, eps_pca, eps, d,  tol=1e-6):
     
     sigma = {}
     nRemoteEdges = 0
+    I_d = np.eye(d)
     totalEdgesBeforeRemoval = len(G.edges)
     print('Total edges before removal:', totalEdgesBeforeRemoval)
     for i in tqdm(range(n)):
@@ -190,10 +191,13 @@ def cnxFromData_v2(X, eps_pca, eps, d,  tol=1e-6):
             O_jO_jT = O_j.dot(O_j.T)
             grassmannian = np.linalg.norm(O_iO_iT-O_jO_jT, ord=2)
             if grassmannian < tol:
-                O_iTO_j = O_i.T.dot(O_j)
-                U, Sigma, VT = svd(O_iTO_j)
-                sigma_ij = U.dot(VT)
-                sigma[(i,j)] = sigma_ij
+                if triv_sigma:
+                    sigma[(i,j)] = I_d
+                else:
+                    O_iTO_j = O_i.T.dot(O_j)
+                    U, Sigma, VT = svd(O_iTO_j)
+                    sigma_ij = U.dot(VT)
+                    sigma[(i,j)] = sigma_ij
             else:
                 G.remove_edge(i, j)
                 nRemoteEdges += 1
@@ -203,10 +207,18 @@ def cnxFromData_v2(X, eps_pca, eps, d,  tol=1e-6):
     #cnx.printConnectionLaplacianEigenvalues()
     assert cnx.number_of_nodes() == n, 'a node is missing'
 
+    edge_attribs = {}
     for i in tqdm(range(n)):
         n_i = nx.neighbors(cnx, i)
         for j in [j for j in n_i if j > i]:
-            cnx.updateEdgeSignature((i,j), sigma[(i,j)])
+            sigma_ij = sigma[(i,j)]
+            cnx.updateEdgeSignature((i,j), sigma_ij)
+            if d == 2:
+                edge_attribs[(i,j)] = {'theta': np.arctan2(sigma_ij[1,0], sigma_ij[0,0]) + np.pi,
+                                       'reflection': np.linalg.det(sigma_ij)}
+    
+    if d == 2:
+        nx.set_edge_attributes(cnx, edge_attribs)
             
     #cnx.printConnectionLaplacianEigenvalues()
     return cnx
