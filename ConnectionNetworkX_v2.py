@@ -36,7 +36,7 @@ class ConnectionNetworkX(nx.Graph):
         adj_mat = triu(nx.adjacency_matrix(self))
         directed_self = nx.DiGraph(adj_mat)
         #W = kron(nx.adjacency_matrix(directed_self), np.ones((self.d, self.d)))
-        B_ = nx.incidence_matrix(directed_self, oriented=True, weight='weight')
+        B_ = -nx.incidence_matrix(directed_self, oriented=True, weight='weight')
         B_.data = np.sign(B_.data)*np.sqrt(np.abs(B_.data))
         self.B = kron(B_, np.eye(self.d))
         self.CL = self.B.dot(self.B.T)
@@ -157,7 +157,7 @@ def gaussian_kernel(W, eps):
     return W
 
 # eps_pca <= eps
-def cnxFromData_v2(X, eps_pca, eps, d,  tol=1e-6, triv_sigma=False):
+def cnxFromData_v2(X, eps_pca, eps, d,  tol=1e-6, kernel='gaussian', triv_sigma=False):
     # Form neighborhoods
     neigh = NearestNeighbors(radius=eps)
     neigh.fit(X)
@@ -175,7 +175,10 @@ def cnxFromData_v2(X, eps_pca, eps, d,  tol=1e-6, triv_sigma=False):
         O[i,:,:] = O_i
     
     neigh_graph = neigh.radius_neighbors_graph(mode='distance')
-    G = nx.Graph(gaussian_kernel(neigh_graph, eps))
+    if kernel == 'gaussian':
+        G = nx.Graph(gaussian_kernel(neigh_graph, eps))
+    else:
+        G = nx.Graph(neigh_graph)
     
     sigma = {}
     nRemoteEdges = 0
